@@ -19,6 +19,7 @@ export interface NetworkLink {
   id: string;
   endpointA: LinkEndpoint;
   endpointB: LinkEndpoint;
+  cableTypeId?: string;
 }
 
 export interface NetworkProject {
