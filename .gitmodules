@@ -1,0 +1,9 @@
+[submodule "vendor/netsim"]
+	path = vendor/netsim
+	url = https://github.com/joxorsayan/netsim.git
+	branch = main
+
+[submodule "vendor/netbox-device-type-library"]
+	path = vendor/netbox-device-type-library
+	url = https://github.com/netbox-community/devicetype-library.git
+	branch = master
