@@ -20,6 +20,7 @@ export interface ConnectInterfacesInput {
   interfaceA: string;
   deviceB: string;
   interfaceB: string;
+  cableTypeId?: string;
 }
 
 export interface DisconnectLinkInput {
