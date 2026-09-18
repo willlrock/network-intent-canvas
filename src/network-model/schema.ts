@@ -21,6 +21,7 @@ export const NetworkLinkSchema = z.object({
   id: z.string().min(1, 'Link ID must not be empty'),
   endpointA: LinkEndpointSchema,
   endpointB: LinkEndpointSchema,
+  cableTypeId: z.string().min(1).optional().default('ethernet-copper'),
 });
 
 export const NetworkProjectSchema = z.object({
