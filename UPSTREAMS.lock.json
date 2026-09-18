@@ -1,0 +1,14 @@
+{
+  "netsim": {
+    "repository": "https://github.com/joxorsayan/netsim.git",
+    "commit": "fb07a807f86f2daa64822b54239e3fcb53850693",
+    "license": "MIT",
+    "role": "topology editor, CLI, simulation, intent/drift and web application"
+  },
+  "netbox-device-type-library": {
+    "repository": "https://github.com/netbox-community/devicetype-library.git",
+    "commit": "5c03c1a47b1f0bb504523b849d21a8575bfe80f4",
+    "license": "CC0-1.0",
+    "role": "hardware definitions, interfaces and existing elevation images"
+  }
+}

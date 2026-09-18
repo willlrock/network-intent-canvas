@@ -1,61 +1,103 @@
-# Network Intent Canvas (v0.1 Prototype)
+# Network Intent Canvas
 
-**Network Intent Canvas** is an open-source visual network topology canvas designed for network engineers and AI agents.
+Network Intent Canvas is an OSS-first network engineering cockpit.
 
-## Key Principles & Architecture
+The project deliberately does **not** reimplement a topology editor, terminal, simulator, device image set, or hardware catalogue when mature open-source projects already provide them.
 
-1. **Deterministic Device Types vs. Device Instances**:
-   - Every node on the canvas references a deterministic hardware profile in the `DeviceRegistry` (`src/device-registry/`).
-   - Supported devices in v0.1:
-     - **MikroTik RB5009UG+S+** (8x RJ45 ether1-ether8, 1x SFP+ sfp-sfpplus1)
-     - **MikroTik CRS326-24G-2S+** (24x RJ45 ether1-ether24, 2x SFP+ sfp-sfpplus1, sfp-sfpplus2)
-     - **Ubiquiti UniFi U6 Pro** (1x GbE PoE Uplink eth0, Wi-Fi 6 2.4G & 5G MIMO Radios)
-2. **Network Model is the Source of Truth**:
-   - The authoritative state is `NetworkProject` (`src/network-model/`), containing `devices: DeviceInstance[]` and `links: NetworkLink[]`.
-   - Links reference exact physical interfaces (`deviceId` and `interfaceId`).
-   - React Flow nodes and edges are strictly derived projections of this authoritative model.
-3. **Structured Operation API (Single Mutation Path)**:
-   - All topology changes (from mouse clicks, drag-and-drop, or future AI agents) flow through deterministic operations:
-     - `addDevice({ deviceTypeId, position, name? })`
-     - `removeDevice({ deviceId })`
-     - `moveDevice({ deviceId, position })`
-     - `connectInterfaces({ deviceA, interfaceA, deviceB, interfaceB })`
-     - `disconnectLink({ linkId })`
-     - `renameDevice({ deviceId, name })`
-     - `loadProject({ project })`
-     - `resetProject()`
-4. **Deterministic Validation**:
-   - Enforces physical constraints:
-     - Prevents duplicate physical connections on the same interface.
-     - Prevents self-loops (connecting a device to itself).
-     - Validates interface existence and supported device types.
-     - Warns on physical media mismatches (e.g., direct SFP+ to RJ45 without transceiver).
-5. **Persistence**:
-   - Automatic local storage sync and manual save.
-   - Versioned JSON export and import (`schemaVersion: 1`) validated with Zod.
-6. **CLI Terminal Placeholder**:
-   - Bottom panel terminal powered by `@xterm/xterm` with device context and architected for future SSH/API websocket streaming.
+## Current foundation
 
----
+The repository pins two upstream projects as Git submodules:
 
-## Quick Start
+- **NetSim** — the current topology editor, device/link interaction, CLI, simulator, intent/drift tooling and browser UI.
+- **NetBox Device Type Library** — the hardware catalogue: real vendors/models, interfaces, console/power ports and upstream front/rear device images where available.
 
-### Install Dependencies
+The custom code in this repository is intentionally small. It currently adds a read-only hardware-catalog API on top of the NetSim FastAPI application.
+
+## Architecture rule
+
+Before implementing any feature, first look for a maintained OSS implementation.
+
+Examples:
+
+- topology/canvas/CLI/simulation → NetSim first;
+- real device definitions and images → NetBox Device Type Library;
+- inventory/IPAM/source of truth → Nautobot/NetBox;
+- intended config/compliance → Nautobot Golden Config;
+- automation → Nornir;
+- SSH → Scrapli/Netmiko;
+- CLI parsing → NTC Templates/TextFSM;
+- lab/emulation → Containerlab/GNS3/CORE where appropriate.
+
+Do not add hand-drawn device graphics or a second hand-authored hardware catalogue.
+
+## Clone
+
+Because the project uses submodules:
+
 ```bash
-npm install
+git clone --recurse-submodules https://github.com/willlrock/network-intent-canvas.git
+cd network-intent-canvas
 ```
 
-### Run Development Server
+If you already cloned the repository:
+
 ```bash
-npm run dev
+git pull
+git submodule update --init --recursive
 ```
 
-### Run Tests
+## Run
+
+Linux / WSL:
+
 ```bash
-npm test
+make bootstrap
+make run
 ```
 
-### Build Production Bundle
-```bash
-npm run build
+Then open:
+
+```text
+http://127.0.0.1:8000
 ```
+
+The UI you see is the reused NetSim web interface, not a separately rebuilt canvas.
+
+## Hardware catalogue API
+
+The wrapper exposes the upstream NetBox Device Type Library without maintaining another copy of the device data.
+
+Examples:
+
+```text
+GET /api/hardware/status
+GET /api/hardware/device-types?q=RB5009
+GET /api/hardware/device-types?q=CRS326
+GET /api/hardware/device-types?q=U6
+GET /api/hardware/device-types/mikrotik-rb5009ug-plus-s-plus-in
+GET /api/hardware/device-types/mikrotik-crs326-24g-2s-plus-rm/image/front
+```
+
+If the upstream library has a front/rear image for a model, the API serves that existing asset directly. Nothing is generated or redrawn by this project.
+
+## Tests
+
+```bash
+make test
+```
+
+This runs the NetSim upstream tests plus the small integration-layer tests in this repository.
+
+## Direction
+
+Next steps are intentionally integration work, not rebuilding existing products:
+
+1. expose Device Type Library models inside the existing NetSim device workflow;
+2. map exact upstream interfaces into topology links;
+3. add live-device adapters while keeping NetSim simulation as an optional backend;
+4. add Nautobot/Nornir/Scrapli/NTC adapters;
+5. add AI only as an orchestration layer over deterministic operations.
+
+Mouse actions and future AI actions must use the same deterministic operations. The LLM must never invent unsupported hardware or arbitrary device CLI.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution.

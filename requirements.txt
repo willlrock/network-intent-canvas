@@ -1,0 +1,2 @@
+-r vendor/netsim/requirements.txt
+PyYAML==6.0.2
