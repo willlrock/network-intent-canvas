@@ -1,10 +1,24 @@
-export type DeviceCategory = 'router' | 'switch' | 'access-point';
+export type DeviceCategory =
+  | 'router'
+  | 'switch'
+  | 'access-point'
+  | 'firewall'
+  | 'server'
+  | 'desktop'
+  | 'laptop'
+  | 'printer'
+  | 'ip-phone'
+  | 'camera'
+  | 'nvr'
+  | 'nas'
+  | 'internet'
+  | 'generic-endpoint';
 
-export type InterfaceMedia = 'rj45' | 'sfp' | 'sfp+' | 'wireless';
+export type InterfaceMedia = 'rj45' | 'sfp' | 'sfp+' | 'wireless' | 'console';
 
 export interface InterfaceDefinition {
-  id: string; // e.g. "ether1", "sfp-sfpplus1"
-  name: string; // display name
+  id: string;
+  name: string;
   media: InterfaceMedia;
   maxSpeedMbps: number;
   poeIn?: boolean;
@@ -12,7 +26,7 @@ export interface InterfaceDefinition {
 }
 
 export interface DeviceCapabilities {
-  osFamily?: 'RouterOS' | 'UniFi OS' | 'SwOS' | 'Custom';
+  osFamily?: 'RouterOS' | 'UniFi OS' | 'SwOS' | 'Generic' | 'Custom';
   routing?: boolean;
   switching?: boolean;
   wifi?: string;
@@ -22,13 +36,18 @@ export interface DeviceCapabilities {
   description?: string;
 }
 
+export interface DeviceVisualDefinition {
+  logicalSymbol: DeviceCategory;
+}
+
 export interface DeviceType {
-  id: string; // unique deterministic type ID, e.g. "mikrotik-rb5009"
+  id: string;
   vendor: string;
   model: string;
   category: DeviceCategory;
   interfaces: InterfaceDefinition[];
   capabilities: DeviceCapabilities;
+  visual: DeviceVisualDefinition;
   dimensions?: {
     rackUnits?: number;
     width?: number;
