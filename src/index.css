@@ -16,25 +16,27 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* React Flow custom styles */
-.react-flow__handle {
-  transition: transform 0.15s ease, background-color 0.15s ease;
+.react-flow__node {
+  cursor: grab;
 }
 
-.react-flow__handle:hover {
-  transform: scale(1.4);
+.react-flow__node.dragging {
+  cursor: grabbing;
 }
 
 .react-flow__edge-path {
-  stroke-dasharray: 4 4;
-  animation: dash 20s linear infinite;
+  stroke-linecap: round;
 }
 
-@keyframes dash {
-  from {
-    stroke-dashoffset: 200;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
+.react-flow__handle {
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.35);
+  opacity: 1 !important;
+}
+
+.react-flow__attribution {
+  display: none;
 }
