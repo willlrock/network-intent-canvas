@@ -1,13 +1,15 @@
 import { DeviceRegistry } from '../device-registry';
+import { CableRegistry } from '../cable-registry';
 import { NetworkProject, ValidationIssue } from './types';
 
 export function validateNetworkProject(project: NetworkProject): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-
-  const deviceMap = new Map<string, { instance: typeof project.devices[0]; typeDef: ReturnType<typeof DeviceRegistry.getById> }>();
+  const deviceMap = new Map<
+    string,
+    { instance: (typeof project.devices)[0]; typeDef: ReturnType<typeof DeviceRegistry.getById> }
+  >();
   const seenDeviceIds = new Set<string>();
 
-  // 1. Validate Devices
   for (const device of project.devices) {
     if (seenDeviceIds.has(device.id)) {
       issues.push({
@@ -32,8 +34,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
     }
   }
 
-  // 2. Validate Links and Ports
-  // Map of "deviceId:interfaceId" -> linkId
   const occupiedPorts = new Map<string, string>();
   const seenLinkPairs = new Set<string>();
 
@@ -41,7 +41,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
     const devA = deviceMap.get(link.endpointA.deviceId);
     const devB = deviceMap.get(link.endpointB.deviceId);
 
-    // Endpoint A device existence
     if (!devA) {
       issues.push({
         id: `missing-dev-a-${link.id}`,
@@ -51,8 +50,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
       });
       continue;
     }
-
-    // Endpoint B device existence
     if (!devB) {
       issues.push({
         id: `missing-dev-b-${link.id}`,
@@ -63,7 +60,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
       continue;
     }
 
-    // Self connection
     if (link.endpointA.deviceId === link.endpointB.deviceId) {
       issues.push({
         id: `self-link-${link.id}`,
@@ -74,8 +70,9 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
       });
     }
 
-    // Interface validity
     const ifaceA = devA.typeDef?.interfaces.find((i) => i.id === link.endpointA.interfaceId);
+    const ifaceB = devB.typeDef?.interfaces.find((i) => i.id === link.endpointB.interfaceId);
+
     if (!ifaceA) {
       issues.push({
         id: `invalid-iface-a-${link.id}`,
@@ -86,8 +83,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
         interfaceId: link.endpointA.interfaceId,
       });
     }
-
-    const ifaceB = devB.typeDef?.interfaces.find((i) => i.id === link.endpointB.interfaceId);
     if (!ifaceB) {
       issues.push({
         id: `invalid-iface-b-${link.id}`,
@@ -99,7 +94,6 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
       });
     }
 
-    // Check port already occupied
     const keyA = `${link.endpointA.deviceId}:${link.endpointA.interfaceId}`;
     const keyB = `${link.endpointB.deviceId}:${link.endpointB.interfaceId}`;
 
@@ -112,9 +106,7 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
         deviceId: link.endpointA.deviceId,
         interfaceId: link.endpointA.interfaceId,
       });
-    } else {
-      occupiedPorts.set(keyA, link.id);
-    }
+    } else occupiedPorts.set(keyA, link.id);
 
     if (occupiedPorts.has(keyB)) {
       issues.push({
@@ -125,11 +117,8 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
         deviceId: link.endpointB.deviceId,
         interfaceId: link.endpointB.interfaceId,
       });
-    } else {
-      occupiedPorts.set(keyB, link.id);
-    }
+    } else occupiedPorts.set(keyB, link.id);
 
-    // Check duplicate links between same ports
     const orderedPair = [keyA, keyB].sort().join('<-->');
     if (seenLinkPairs.has(orderedPair)) {
       issues.push({
@@ -141,17 +130,38 @@ export function validateNetworkProject(project: NetworkProject): ValidationIssue
     }
     seenLinkPairs.add(orderedPair);
 
-    // Media type compatibility warning
     if (ifaceA && ifaceB) {
       const isSfpA = ifaceA.media === 'sfp' || ifaceA.media === 'sfp+';
       const isSfpB = ifaceB.media === 'sfp' || ifaceB.media === 'sfp+';
+
       if ((isSfpA && ifaceB.media === 'rj45') || (ifaceA.media === 'rj45' && isSfpB)) {
         issues.push({
           id: `media-mismatch-${link.id}`,
           severity: 'warning',
-          message: `Direct link between ${ifaceA.media.toUpperCase()} (${devA.instance.name}:${ifaceA.name}) and ${ifaceB.media.toUpperCase()} (${devB.instance.name}:${ifaceB.name}) requires media converter or copper SFP transceiver.`,
+          message:
+            `Direct link between ${ifaceA.media.toUpperCase()} (${devA.instance.name}:${ifaceA.name}) and ` +
+            `${ifaceB.media.toUpperCase()} (${devB.instance.name}:${ifaceB.name}) requires media converter or copper SFP transceiver.`,
           linkId: link.id,
         });
+      }
+
+      if (link.cableTypeId) {
+        const cable = CableRegistry.getById(link.cableTypeId);
+        if (!cable) {
+          issues.push({
+            id: `unknown-cable-${link.id}`,
+            severity: 'error',
+            message: `Link references unknown CableType "${link.cableTypeId}"`,
+            linkId: link.id,
+          });
+        } else if (!CableRegistry.isCompatible(cable.id, ifaceA.media, ifaceB.media)) {
+          issues.push({
+            id: `cable-mismatch-${link.id}`,
+            severity: 'error',
+            message: `${cable.name} is incompatible with ${ifaceA.media.toUpperCase()} and ${ifaceB.media.toUpperCase()} interfaces.`,
+            linkId: link.id,
+          });
+        }
       }
     }
   }
