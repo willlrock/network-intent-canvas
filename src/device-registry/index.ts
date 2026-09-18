@@ -1,8 +1,25 @@
 import { DEVICE_CATALOG } from './catalog';
-import { DeviceType } from './types';
+import { DeviceCategory, DeviceType } from './types';
 
 export * from './types';
 export * from './catalog';
+
+const CATEGORY_PREFIX: Partial<Record<DeviceCategory, string>> = {
+  router: 'RTR',
+  switch: 'SW',
+  'access-point': 'AP',
+  firewall: 'FW',
+  server: 'SRV',
+  desktop: 'PC',
+  laptop: 'LAP',
+  printer: 'PRN',
+  'ip-phone': 'PHONE',
+  camera: 'CAM',
+  nvr: 'NVR',
+  nas: 'NAS',
+  internet: 'INET',
+  'generic-endpoint': 'HOST',
+};
 
 export class DeviceRegistry {
   private static catalog: Map<string, DeviceType> = new Map(
@@ -25,26 +42,19 @@ export class DeviceRegistry {
     return Array.from(new Set(this.getAll().map((d) => d.category)));
   }
 
-  /**
-   * Generates a deterministic device hostname/label based on existing instances.
-   * e.g., RB5009-01, RB5009-02, CRS326-01, U6PRO-01
-   */
   static generateDeterministicName(deviceTypeId: string, existingNames: string[]): string {
     const deviceType = this.getById(deviceTypeId);
     let prefix = 'DEV';
-    if (deviceType) {
-      if (deviceType.id.includes('rb5009')) prefix = 'RB5009';
-      else if (deviceType.id.includes('crs326')) prefix = 'CRS326';
-      else if (deviceType.id.includes('u6-pro')) prefix = 'U6PRO';
-      else prefix = deviceType.model.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
-    }
+
+    if (deviceTypeId.includes('rb5009')) prefix = 'RB5009';
+    else if (deviceTypeId.includes('crs326')) prefix = 'CRS326';
+    else if (deviceTypeId.includes('u6-pro')) prefix = 'U6PRO';
+    else if (deviceType) prefix = CATEGORY_PREFIX[deviceType.category] || 'DEV';
 
     let index = 1;
     while (true) {
       const candidate = `${prefix}-${String(index).padStart(2, '0')}`;
-      if (!existingNames.includes(candidate)) {
-        return candidate;
-      }
+      if (!existingNames.includes(candidate)) return candidate;
       index++;
     }
   }
