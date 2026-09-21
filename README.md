@@ -1,56 +1,81 @@
 # Network Intent Canvas
 
-Network Intent Canvas is an OSS-first controller for discovering, modelling and later changing real networks.
+Network Intent Canvas is an OSS-first, deterministic controller for discovering, visualizing, designing and later changing real networks.
 
-The product goal is:
+The target user experience is simple:
 
 ~~~text
-real network
-   ↓ discover
-deterministic observed topology
-   ↓ compare
-desired topology / intent
-   ↓ review
-structured change plan
-   ↓ approve
-vendor adapter
-   ↓
-real devices
+connect real network
+      ->
+network is discovered and drawn with real ports
+      ->
+inspect actual state and evidence
+      ->
+edit the desired network or describe the change to AI
+      ->
+review deterministic diff/change plan
+      ->
+approve supported changes
+      ->
+apply, rediscover and verify
 ~~~
 
-The AI layer will sit above this model. It must never invent a physical port, a cable, a device capability or arbitrary CLI.
+The project is not trying to rebuild Packet Tracer, NetBox/Nautobot, Nornir, SSH libraries, device catalogues or network parsers. Existing OSS should be reused wherever it fits. Our unique layer is the deterministic workflow that connects real-network discovery, topology evidence, desired intent, visualization, AI and safe change execution.
 
-## Current milestone: real-network discovery
+## Project documents
 
-The current code is deliberately **OBSERVE only**.
+- **[PROJECT.md](PROJECT.md)** — what the product is, what it provides today and non-negotiable rules.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — observed/desired/canonical state boundaries, evidence model, AI boundary and future change architecture.
+- **[ROADMAP.md](ROADMAP.md)** — ordered milestones from reliable discovery to visualization, desired state and safe APPLY.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — OSS-first development rules.
 
-It connects to MikroTik RouterOS over SSH using **Netmiko** and parses supported RouterOS output using the existing **NTC Templates/TextFSM** templates. It collects:
+## Current milestone: OBSERVE
 
-- system identity and RouterOS version;
-- hardware model / serial where available;
-- interfaces and interface state;
-- IP addresses;
-- RouterOS neighbor data (LLDP/MNDP/CDP surfaced by /ip neighbor);
-- bridge forwarding database (MAC table);
-- ARP entries.
+Today the project is a Python API for read-only RouterOS discovery.
 
-The discovery result is converted into an observed topology with evidence.
+It currently provides:
 
-Neighbor identity is correlated against the devices actually discovered in the same run by hostname, management IP and observed interface MACs. A link is marked **confirmed** only when both endpoint devices are present in the snapshot and both exact ports are known. If one side omits the peer port but the reverse neighbor record supplies it, the two observations are correlated. A named but undiscovered neighbor remains **observed**, never silently upgraded to confirmed.
+- RouterOS SSH collection through Netmiko;
+- deterministic parsing through NTC Templates/TextFSM;
+- device/interface/IP/neighbor/FDB/ARP observations;
+- evidence-bearing physical topology;
+- unknown downstream segments instead of invented direct cables;
+- read-only NetBox Device Type Library lookup and existing upstream hardware assets;
+- local persistence of the latest observation;
+- tests and CI.
 
-MAC-table data by itself never becomes a made-up physical cable: it becomes an **unknown downstream segment** until there is stronger evidence or an administrator confirms it.
+It does **not** yet have a graphical topology frontend, AI desired-state generation, Nautobot reconciliation or production configuration writes.
+
+The immediate priority is to make observed topology trustworthy before adding visualization. See ROADMAP.md.
+
+## Deterministic rule
+
+The AI layer must never invent a physical fact.
+
+~~~text
+real network evidence -> observed state
+human/AI proposal     -> desired state
+observed != desired
+~~~
+
+A MAC table entry is not automatically a cable. A hostname is not automatically stable identity. An AI suggestion is never observed state.
 
 ## OSS components
 
-We reuse existing projects instead of rebuilding them:
+Current:
 
-- **NetBox Device Type Library** — physical hardware definitions and existing device assets;
+- **NetBox Device Type Library** — real hardware definitions and existing device assets;
 - **Netmiko** — RouterOS SSH transport;
-- **NTC Templates / TextFSM** — RouterOS CLI parsing;
-- **Nautobot** — planned canonical source of truth / desired state;
-- **Nautobot Golden Config / Nornir** — planned compliance and deterministic execution.
+- **NTC Templates / TextFSM** — deterministic RouterOS CLI parsing.
 
-NetSim is no longer the application foundation. Simulation can return later as an optional backend, but the product is centred on real-network state.
+Planned/evaluated before custom alternatives:
+
+- **Nautobot / NetBox** — canonical source of truth, inventory and IPAM;
+- **Nautobot Golden Config / Nornir** — compliance and deterministic execution;
+- **existing OSS topology editors/viewers** — visualization and editing;
+- **Containerlab / GNS3 / CORE** — optional lab/emulation backends.
+
+NetSim is not the application foundation.
 
 ## Clone and bootstrap
 
@@ -60,7 +85,7 @@ cd network-intent-canvas
 make bootstrap
 ~~~
 
-For an existing clone after this architecture change:
+For an existing clone:
 
 ~~~bash
 git pull
@@ -69,7 +94,7 @@ git submodule update --init --recursive
 make bootstrap
 ~~~
 
-make bootstrap also builds a local index for the NetBox Device Type Library, so the first hardware lookup does not synchronously parse thousands of YAML files.
+Bootstrap builds a local index for the NetBox Device Type Library so the first lookup does not synchronously parse thousands of YAML files.
 
 ## Run
 
@@ -79,7 +104,7 @@ make run
 
 The server binds to **127.0.0.1 only** because authentication/authorization is not implemented yet.
 
-Open API documentation at:
+Open:
 
 ~~~text
 http://127.0.0.1:8000/docs
@@ -110,39 +135,17 @@ curl -X POST http://127.0.0.1:8000/api/discovery/routeros \
 
 Credentials are used for the connection and are not persisted in the discovery snapshot.
 
-The latest successful/partial observation can be read from:
+Read the latest snapshot:
 
 ~~~text
 GET /api/topology/observed
 ~~~
 
-A confirmed link requires both devices and both exact ports to be observed:
-
-~~~json
-{
-  "endpoint_a": {"device_id": "SW-01", "interface": "sfp-sfpplus1"},
-  "endpoint_b": {"device_id": "SW-02", "interface": "sfp-sfpplus2"},
-  "confidence": "confirmed",
-  "evidence": [
-    {
-      "source": "routeros_neighbor",
-      "source_device": "SW-01",
-      "source_interface": "sfp-sfpplus1"
-    },
-    {
-      "source": "routeros_neighbor",
-      "source_device": "SW-02",
-      "source_interface": "sfp-sfpplus2"
-    }
-  ]
-}
-~~~
-
-If only FDB/MAC evidence exists, the app emits an unknown segment rather than pretending to know the cable.
+Current topology confidence is still being hardened. ROADMAP.md documents the stricter target model: observed, confirmed, conflict and manual.
 
 ## Hardware catalogue
 
-The project does not maintain a second hardware catalogue. It reads the upstream NetBox Device Type Library.
+The project does not maintain a second hardware catalogue.
 
 ~~~text
 GET /api/hardware/status
@@ -152,7 +155,7 @@ GET /api/hardware/device-types/mikrotik-rb5009ug-plus-s-plus-in
 GET /api/hardware/device-types/mikrotik-crs326-24g-2s-plus-rm/image/front
 ~~~
 
-Where the upstream library has an image, that existing asset is served directly. Nothing is redrawn here.
+Where the upstream library has an asset, that existing asset is served directly. Nothing is redrawn here.
 
 ## Tests
 
@@ -160,16 +163,16 @@ Where the upstream library has an image, that existing asset is served directly.
 make test
 ~~~
 
-## What is intentionally not implemented yet
+## Current safety boundary
 
-- no configuration writes;
-- no AI-generated commands;
+There are intentionally:
+
+- no configuration-write endpoints;
+- no AI-generated raw commands;
 - no automatic remediation;
-- no public/network-facing unauthenticated deployment;
-- no inference of physical links from a single MAC address;
-- no UniFi controller collector yet;
-- no Nautobot write-back yet.
+- no production APPLY mode;
+- no public unauthenticated deployment.
 
-The next milestone is to test discovery against a real RouterOS network, fix vendor/firmware edge cases, then add UniFi Controller evidence and Nautobot reconciliation.
+The future write path is **PLAN -> approve -> APPLY -> postcheck -> rediscover -> verify**, never “LLM sends arbitrary SSH”.
 
-See THIRD_PARTY_NOTICES.md.
+See THIRD_PARTY_NOTICES.md for upstream attribution.
