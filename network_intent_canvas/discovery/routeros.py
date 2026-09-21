@@ -39,7 +39,8 @@ class RouterOSCollector:
         "addresses": "/ip address print",
         "neighbors": "/ip neighbor print detail",
         "fdb": "/interface bridge host print terse without-paging",
-        "arp": "/ip arp print without-paging",
+        # Keep the command aligned with the upstream NTC template index.
+        "arp": "/ip arp print",
     }
 
     def __init__(self, device_library: DeviceTypeLibrary):
@@ -163,14 +164,20 @@ class RouterOSCollector:
                     mac_address=row.get("mac_address") or None,
                     enabled=status != "X",
                     running=status == "R",
-                    addresses=sorted(addresses_by_interface.get(interface_name, [])),
+                    addresses=sorted(
+                        addresses_by_interface.get(interface_name, [])
+                    ),
                 )
             )
 
         neighbors: list[NeighborObservation] = []
         for row in tables.get("neighbors", []):
             local_interface = row.get("interface")
-            peer_name = row.get("identity") or row.get("mac_address") or row.get("ip_address")
+            peer_name = (
+                row.get("identity")
+                or row.get("mac_address")
+                or row.get("ip_address")
+            )
             if not local_interface or not peer_name:
                 continue
             neighbors.append(
@@ -222,7 +229,7 @@ class RouterOSCollector:
                     interface=row.get("interface") or None,
                     ip_address=ip,
                     mac_address=row.get("mac_address") or None,
-                    status=row.get("status") or None,
+                    status=row.get("flags") or row.get("status") or None,
                 )
             )
 

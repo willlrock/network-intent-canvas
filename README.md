@@ -36,7 +36,9 @@ It connects to MikroTik RouterOS over SSH using **Netmiko** and parses supported
 
 The discovery result is converted into an observed topology with evidence.
 
-A direct neighbor with a known local and remote interface becomes a confirmed link. MAC-table data by itself never becomes a made-up physical cable: it becomes an **unknown downstream segment** until there is stronger evidence or an administrator confirms it.
+Neighbor identity is correlated against the devices actually discovered in the same run by hostname, management IP and observed interface MACs. A link is marked **confirmed** only when both endpoint devices are present in the snapshot and both exact ports are known. If one side omits the peer port but the reverse neighbor record supplies it, the two observations are correlated. A named but undiscovered neighbor remains **observed**, never silently upgraded to confirmed.
+
+MAC-table data by itself never becomes a made-up physical cable: it becomes an **unknown downstream segment** until there is stronger evidence or an administrator confirms it.
 
 ## OSS components
 
@@ -114,18 +116,23 @@ The latest successful/partial observation can be read from:
 GET /api/topology/observed
 ~~~
 
-Example link shape:
+A confirmed link requires both devices and both exact ports to be observed:
 
 ~~~json
 {
-  "endpoint_a": {"device_id": "SW-01", "interface": "ether8"},
-  "endpoint_b": {"device_id": "U6PRO-03", "interface": "eth0"},
+  "endpoint_a": {"device_id": "SW-01", "interface": "sfp-sfpplus1"},
+  "endpoint_b": {"device_id": "SW-02", "interface": "sfp-sfpplus2"},
   "confidence": "confirmed",
   "evidence": [
     {
       "source": "routeros_neighbor",
       "source_device": "SW-01",
-      "source_interface": "ether8"
+      "source_interface": "sfp-sfpplus1"
+    },
+    {
+      "source": "routeros_neighbor",
+      "source_device": "SW-02",
+      "source_interface": "sfp-sfpplus2"
     }
   ]
 }

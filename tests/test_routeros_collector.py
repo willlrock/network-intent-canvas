@@ -30,3 +30,7 @@ def test_unparsed_cli_is_rejected_instead_of_guessed() -> None:
         RouterOSCollector._normalize_records(
             "raw RouterOS output that was not parsed"
         )
+
+
+def test_routeros_arp_command_matches_upstream_ntc_template() -> None:
+    assert RouterOSCollector.OPTIONAL_COMMANDS["arp"] == "/ip arp print"
