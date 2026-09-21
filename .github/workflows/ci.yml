@@ -27,4 +27,4 @@ jobs:
         run: python -m network_intent_canvas.build_device_index
 
       - name: Run tests
-        run: pytest -q tests
+        run: python -m pytest -q tests
