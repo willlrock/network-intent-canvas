@@ -1,103 +1,168 @@
 # Network Intent Canvas
 
-Network Intent Canvas is an OSS-first network engineering cockpit.
+Network Intent Canvas is an OSS-first controller for discovering, modelling and later changing real networks.
 
-The project deliberately does **not** reimplement a topology editor, terminal, simulator, device image set, or hardware catalogue when mature open-source projects already provide them.
+The product goal is:
 
-## Current foundation
+~~~text
+real network
+   ↓ discover
+deterministic observed topology
+   ↓ compare
+desired topology / intent
+   ↓ review
+structured change plan
+   ↓ approve
+vendor adapter
+   ↓
+real devices
+~~~
 
-The repository pins two upstream projects as Git submodules:
+The AI layer will sit above this model. It must never invent a physical port, a cable, a device capability or arbitrary CLI.
 
-- **NetSim** — the current topology editor, device/link interaction, CLI, simulator, intent/drift tooling and browser UI.
-- **NetBox Device Type Library** — the hardware catalogue: real vendors/models, interfaces, console/power ports and upstream front/rear device images where available.
+## Current milestone: real-network discovery
 
-The custom code in this repository is intentionally small. It currently adds a read-only hardware-catalog API on top of the NetSim FastAPI application.
+The current code is deliberately **OBSERVE only**.
 
-## Architecture rule
+It connects to MikroTik RouterOS over SSH using **Netmiko** and parses supported RouterOS output using the existing **NTC Templates/TextFSM** templates. It collects:
 
-Before implementing any feature, first look for a maintained OSS implementation.
+- system identity and RouterOS version;
+- hardware model / serial where available;
+- interfaces and interface state;
+- IP addresses;
+- RouterOS neighbor data (LLDP/MNDP/CDP surfaced by /ip neighbor);
+- bridge forwarding database (MAC table);
+- ARP entries.
 
-Examples:
+The discovery result is converted into an observed topology with evidence.
 
-- topology/canvas/CLI/simulation → NetSim first;
-- real device definitions and images → NetBox Device Type Library;
-- inventory/IPAM/source of truth → Nautobot/NetBox;
-- intended config/compliance → Nautobot Golden Config;
-- automation → Nornir;
-- SSH → Scrapli/Netmiko;
-- CLI parsing → NTC Templates/TextFSM;
-- lab/emulation → Containerlab/GNS3/CORE where appropriate.
+A direct neighbor with a known local and remote interface becomes a confirmed link. MAC-table data by itself never becomes a made-up physical cable: it becomes an **unknown downstream segment** until there is stronger evidence or an administrator confirms it.
 
-Do not add hand-drawn device graphics or a second hand-authored hardware catalogue.
+## OSS components
 
-## Clone
+We reuse existing projects instead of rebuilding them:
 
-Because the project uses submodules:
+- **NetBox Device Type Library** — physical hardware definitions and existing device assets;
+- **Netmiko** — RouterOS SSH transport;
+- **NTC Templates / TextFSM** — RouterOS CLI parsing;
+- **Nautobot** — planned canonical source of truth / desired state;
+- **Nautobot Golden Config / Nornir** — planned compliance and deterministic execution.
 
-```bash
+NetSim is no longer the application foundation. Simulation can return later as an optional backend, but the product is centred on real-network state.
+
+## Clone and bootstrap
+
+~~~bash
 git clone --recurse-submodules https://github.com/willlrock/network-intent-canvas.git
 cd network-intent-canvas
-```
+make bootstrap
+~~~
 
-If you already cloned the repository:
+For an existing clone after this architecture change:
 
-```bash
+~~~bash
 git pull
+git submodule sync
 git submodule update --init --recursive
-```
+make bootstrap
+~~~
+
+make bootstrap also builds a local index for the NetBox Device Type Library, so the first hardware lookup does not synchronously parse thousands of YAML files.
 
 ## Run
 
-Linux / WSL:
-
-```bash
-make bootstrap
+~~~bash
 make run
-```
+~~~
 
-Then open:
+The server binds to **127.0.0.1 only** because authentication/authorization is not implemented yet.
 
-```text
-http://127.0.0.1:8000
-```
+Open API documentation at:
 
-The UI you see is the reused NetSim web interface, not a separately rebuilt canvas.
+~~~text
+http://127.0.0.1:8000/docs
+~~~
 
-## Hardware catalogue API
+## Discover RouterOS devices
 
-The wrapper exposes the upstream NetBox Device Type Library without maintaining another copy of the device data.
+Use a dedicated least-privilege/read-only RouterOS account.
 
-Examples:
+~~~bash
+curl -X POST http://127.0.0.1:8000/api/discovery/routeros \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "targets": [
+      {
+        "host": "192.0.2.10",
+        "username": "discovery",
+        "password": "REPLACE_ME"
+      },
+      {
+        "host": "192.0.2.11",
+        "username": "discovery",
+        "password": "REPLACE_ME"
+      }
+    ]
+  }'
+~~~
 
-```text
+Credentials are used for the connection and are not persisted in the discovery snapshot.
+
+The latest successful/partial observation can be read from:
+
+~~~text
+GET /api/topology/observed
+~~~
+
+Example link shape:
+
+~~~json
+{
+  "endpoint_a": {"device_id": "SW-01", "interface": "ether8"},
+  "endpoint_b": {"device_id": "U6PRO-03", "interface": "eth0"},
+  "confidence": "confirmed",
+  "evidence": [
+    {
+      "source": "routeros_neighbor",
+      "source_device": "SW-01",
+      "source_interface": "ether8"
+    }
+  ]
+}
+~~~
+
+If only FDB/MAC evidence exists, the app emits an unknown segment rather than pretending to know the cable.
+
+## Hardware catalogue
+
+The project does not maintain a second hardware catalogue. It reads the upstream NetBox Device Type Library.
+
+~~~text
 GET /api/hardware/status
 GET /api/hardware/device-types?q=RB5009
 GET /api/hardware/device-types?q=CRS326
-GET /api/hardware/device-types?q=U6
 GET /api/hardware/device-types/mikrotik-rb5009ug-plus-s-plus-in
 GET /api/hardware/device-types/mikrotik-crs326-24g-2s-plus-rm/image/front
-```
+~~~
 
-If the upstream library has a front/rear image for a model, the API serves that existing asset directly. Nothing is generated or redrawn by this project.
+Where the upstream library has an image, that existing asset is served directly. Nothing is redrawn here.
 
 ## Tests
 
-```bash
+~~~bash
 make test
-```
+~~~
 
-This runs the NetSim upstream tests plus the small integration-layer tests in this repository.
+## What is intentionally not implemented yet
 
-## Direction
+- no configuration writes;
+- no AI-generated commands;
+- no automatic remediation;
+- no public/network-facing unauthenticated deployment;
+- no inference of physical links from a single MAC address;
+- no UniFi controller collector yet;
+- no Nautobot write-back yet.
 
-Next steps are intentionally integration work, not rebuilding existing products:
+The next milestone is to test discovery against a real RouterOS network, fix vendor/firmware edge cases, then add UniFi Controller evidence and Nautobot reconciliation.
 
-1. expose Device Type Library models inside the existing NetSim device workflow;
-2. map exact upstream interfaces into topology links;
-3. add live-device adapters while keeping NetSim simulation as an optional backend;
-4. add Nautobot/Nornir/Scrapli/NTC adapters;
-5. add AI only as an orchestration layer over deterministic operations.
-
-Mouse actions and future AI actions must use the same deterministic operations. The LLM must never invent unsupported hardware or arbitrary device CLI.
-
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution.
+See THIRD_PARTY_NOTICES.md.

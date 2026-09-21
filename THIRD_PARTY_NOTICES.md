@@ -1,28 +1,35 @@
 # Third-party notices
 
-Network Intent Canvas intentionally reuses upstream open-source projects instead of recreating their functionality.
-
-## NetSim
-
-Repository: https://github.com/joxorsayan/netsim  
-Pinned commit: `fb07a807f86f2daa64822b54239e3fcb53850693`  
-License: MIT  
-Copyright (c) 2025 Sayan Roy Chowdhury
-
-NetSim is used as a Git submodule and currently provides the browser topology editor, device/link workflow, CLI, simulation engine, automation/intent features and FastAPI application.
-
-Its original license remains available inside `vendor/netsim/LICENSE`.
+Network Intent Canvas intentionally composes existing open-source projects instead of recreating their functionality.
 
 ## NetBox Device Type Library
 
 Repository: https://github.com/netbox-community/devicetype-library  
-Pinned commit: `5c03c1a47b1f0bb504523b849d21a8575bfe80f4`  
+Pinned submodule commit: 5c03c1a47b1f0bb504523b849d21a8575bfe80f4  
 License: CC0 1.0 Universal
 
-The library is used as a Git submodule and is the source for hardware definitions, interfaces and existing front/rear elevation images.
+Used as the hardware definition and existing elevation-image source.
 
-Its original license remains available inside `vendor/netbox-device-type-library/LICENSE.txt`.
+## Netmiko
+
+Repository: https://github.com/ktbyers/netmiko  
+Runtime version: 4.7.0  
+License: MIT
+
+Used for RouterOS SSH transport. Netmiko already includes the mikrotik_routeros platform driver.
+
+## NTC Templates
+
+Repository: https://github.com/networktocode/ntc-templates  
+Runtime version: 9.3.0  
+License: Apache-2.0
+
+Used for deterministic TextFSM parsing of RouterOS commands including interface, identity/resource, neighbor, ARP and bridge-host output.
+
+## Nautobot ecosystem
+
+Nautobot, Golden Config and Nornir are planned integration targets for source-of-truth, compliance and execution. They are not vendored into this repository at this milestone.
 
 ## Policy
 
-When another OSS project already provides a capability, prefer an adapter or integration over copying/reimplementing it. Preserve upstream attribution and license obligations.
+Before implementing a network capability, first check whether a maintained OSS project already provides it. Prefer adapters and composition over a parallel implementation.

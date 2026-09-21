@@ -1,2 +1,5 @@
--r vendor/netsim/requirements.txt
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+netmiko==4.7.0
+ntc-templates==9.3.0
 PyYAML==6.0.2
