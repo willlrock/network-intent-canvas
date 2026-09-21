@@ -14,7 +14,7 @@ run:
 	.venv/bin/uvicorn network_intent_canvas.main:app --reload --host 127.0.0.1 --port 8000
 
 test:
-	.venv/bin/pytest -q tests
+	.venv/bin/python -m pytest -q tests
 
 upstreams:
 	git submodule status
